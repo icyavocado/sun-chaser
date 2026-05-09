@@ -23,6 +23,8 @@ jobs:
         path: calcbright
     - name: Prepare parent build context
       run: |
+        test -n "${PARENT_WORKSPACE:-}"
+        test "$PARENT_WORKSPACE" != "/"
         rm -rf "$PARENT_WORKSPACE/calcbright"
         cp -a calcbright "$PARENT_WORKSPACE/calcbright"
     - name: Build the Docker image
