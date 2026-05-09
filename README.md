@@ -103,6 +103,3 @@ Development notes
 - The calcbright module is included as a sibling module via a `replace` directive in `go.mod`. The Dockerfile uses the parent directory as build context so both modules are available during the image build.
 - Templates are pre-compiled by the server at startup. HTMX partials are served standalone.
 
-Questions / next steps
-- If you want the worker to prune old analysis rows instead of just pausing collection, I can add a pruning job.
-- If you prefer a different worker backoff strategy or a token-bucket rate limiter instead of fixed sleeps, I can implement that.
