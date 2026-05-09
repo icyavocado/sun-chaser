@@ -11,8 +11,22 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    env:
+      PARENT_WORKSPACE: ${{ github.workspace }}/..
 
     steps:
     - uses: actions/checkout@v4
+    - name: Checkout calcbright sibling module
+      uses: actions/checkout@v4
+      with:
+        repository: icyavocado/calcbright
+        path: calcbright
+    - name: Prepare parent build context
+      run: |
+        test -n "${PARENT_WORKSPACE:-}"
+        test "$PARENT_WORKSPACE" != "/"
+        rm -rf "$PARENT_WORKSPACE/calcbright"
+        cp -a calcbright "$PARENT_WORKSPACE/calcbright"
     - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag my-image-name:$(date +%s)
+      working-directory: ${{ env.PARENT_WORKSPACE }}
+      run: docker build . --file sun-chaser/Dockerfile --tag my-image-name:$(date +%s)
