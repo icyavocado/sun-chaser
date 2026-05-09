@@ -14,7 +14,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Clone calcbright sibling module
-      run: git clone --depth 1 https://github.com/icyavocado/calcbright ../calcbright
+    - name: Checkout calcbright sibling module
+      uses: actions/checkout@v4
+      with:
+        repository: icyavocado/calcbright
+        path: calcbright
+    - name: Prepare parent build context
+      run: |
+        rm -rf ../calcbright
+        cp -a calcbright ../calcbright
     - name: Build the Docker image
-      run: cd .. && docker build . --file sun-chaser/Dockerfile --tag my-image-name:$(date +%s)
+      working-directory: ..
+      run: docker build . --file sun-chaser/Dockerfile --tag my-image-name:$(date +%s)
