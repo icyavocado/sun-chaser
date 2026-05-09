@@ -24,8 +24,19 @@ profile.cov
 go.work
 go.work.sum
 
-# env file
-.env
+# env files — only the example is committed
+.env.*
+!.env.example
+
+# dev server binary and PID file
+.sun-chaser-bin
+.server.pid
+
+# SQLite database files
+*.db
+
+# OpenCode tool config
+.opencode/
 
 # Editor/IDE
 # .idea/

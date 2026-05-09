@@ -1,0 +1,107 @@
+{{define "content"}}
+<form id="analyze-form"
+      hx-post="/analyze"
+      hx-target="#results"
+      hx-swap="innerHTML"
+      hx-indicator="#analyze-btn">
+
+  <fieldset>
+    <legend>Location</legend>
+    <div class="autocomplete-wrapper">
+      <input type="search"
+             id="location-input"
+             placeholder="Search for a city or place..."
+             autocomplete="off"
+             hx-get="/geocode"
+             hx-trigger="keyup[this.value.length > 2] delay:500ms"
+             hx-target="#suggestions"
+             hx-include="[name='q']"
+             name="q"
+             oninput="handleLocationInput(this)">
+      <div id="suggestions" class="suggestions-dropdown" role="listbox"></div>
+    </div>
+    <input type="hidden" id="lat"        name="lat">
+    <input type="hidden" id="lon"        name="lon">
+    <input type="hidden" id="place-name" name="place_name">
+  </fieldset>
+
+  <fieldset>
+    <legend>Display spec</legend>
+    <div class="grid">
+      <label>
+        Max brightness (nits)
+        <input type="number" name="display_nits" value="300" min="50" max="1600" step="10">
+      </label>
+      <label>
+        Reflectance (0–1)
+        <input type="number" name="reflectance" value="0.05" min="0" max="1" step="0.01">
+      </label>
+      <label>
+        Altitude (m)
+        <input type="number" name="alt" value="0" min="0" step="10">
+      </label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Screen orientation</legend>
+    <div class="grid">
+      <label>
+        Azimuth (° from North)
+        <input type="number" name="az" value="180" min="0" max="360">
+        <small>180 = south-facing</small>
+      </label>
+      <label>
+        Tilt (° from horizontal)
+        <input type="number" name="tilt" value="110" min="0" max="180">
+        <small>110 = typical laptop lid angle</small>
+      </label>
+    </div>
+  </fieldset>
+
+  <button type="submit" id="analyze-btn" aria-busy="false">Analyze</button>
+</form>
+
+<div id="results">
+  {{template "empty" .}}
+</div>
+
+<script>
+  let _locationConfirmed = false;
+
+  function handleLocationInput(el) {
+    // If user modifies input after confirming a location, invalidate it.
+    if (_locationConfirmed) {
+      document.getElementById('lat').value = '';
+      document.getElementById('lon').value = '';
+      document.getElementById('place-name').value = '';
+      _locationConfirmed = false;
+    }
+    // Clear suggestions when query is too short.
+    if (el.value.length <= 2) {
+      document.getElementById('suggestions').innerHTML = '';
+    }
+  }
+
+  function selectLocation(name, lat, lon) {
+    document.getElementById('location-input').value = name;
+    document.getElementById('lat').value = lat;
+    document.getElementById('lon').value = lon;
+    document.getElementById('place-name').value = name;
+    document.getElementById('suggestions').innerHTML = '';
+    _locationConfirmed = true;
+  }
+
+  // Show aria-busy spinner on the button while HTMX request is in flight.
+  document.addEventListener('htmx:beforeRequest', function(e) {
+    if (e.detail.elt.id === 'analyze-form') {
+      document.getElementById('analyze-btn').setAttribute('aria-busy', 'true');
+    }
+  });
+  document.addEventListener('htmx:afterRequest', function(e) {
+    if (e.detail.elt.id === 'analyze-form') {
+      document.getElementById('analyze-btn').setAttribute('aria-busy', 'false');
+    }
+  });
+</script>
+{{end}}

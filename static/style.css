@@ -1,0 +1,126 @@
+/* ── Autocomplete dropdown ─────────────────────────────────────────── */
+.autocomplete-wrapper {
+  position: relative;
+}
+
+.suggestions-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: var(--pico-background-color);
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.suggestions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.suggestions-list li {
+  margin: 0;
+  padding: 0;
+}
+
+.suggestion-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--pico-color);
+}
+
+.suggestion-btn:hover,
+.suggestion-btn:focus {
+  background: var(--pico-primary-hover-background);
+  color: var(--pico-primary-inverse);
+  outline: none;
+}
+
+/* ── Site header ───────────────────────────────────────────────────── */
+.site-header {
+  margin-bottom: 2rem;
+}
+
+.site-header h1 {
+  margin-bottom: 0.25rem;
+}
+
+.site-subtitle {
+  color: var(--pico-muted-color);
+  margin: 0;
+}
+
+/* ── Model comparison cards ────────────────────────────────────────── */
+.results-section {
+  margin-top: 2rem;
+}
+
+.analyzed-at {
+  color: var(--pico-muted-color);
+  font-size: 0.85rem;
+  margin-top: -0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.model-grid {
+  gap: 1.5rem;
+}
+
+.model-card dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 1rem;
+  align-items: baseline;
+}
+
+.model-card dt {
+  color: var(--pico-muted-color);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.model-card dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* ── Chart ─────────────────────────────────────────────────────────── */
+.chart-section {
+  margin-top: 2.5rem;
+}
+
+#chart-container {
+  position: relative;
+  max-height: 400px;
+}
+
+#brightness-chart {
+  width: 100% !important;
+  max-height: 380px;
+}
+
+.chart-placeholder {
+  color: var(--pico-muted-color);
+  text-align: center;
+  padding: 2rem 0;
+}
+
+/* ── Empty state ───────────────────────────────────────────────────── */
+.empty-state {
+  text-align: center;
+  color: var(--pico-muted-color);
+  padding: 3rem 0;
+}

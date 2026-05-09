@@ -1,0 +1,22 @@
+{{define "layout"}}<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>sun-chaser</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <main class="container">
+    <header class="site-header">
+      <h1>sun-chaser</h1>
+      <p class="site-subtitle">Compare calcbright clear-sky vs. cloud-adjusted brightness recommendations</p>
+    </header>
+    {{template "content" .}}
+  </main>
+</body>
+</html>
+{{end}}

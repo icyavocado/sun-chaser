@@ -1,0 +1,14 @@
+{{define "suggestions"}}
+{{if .}}
+<ul role="listbox" class="suggestions-list">
+  {{range .}}
+  <li role="option">
+    <button type="button" class="suggestion-btn"
+            onclick="selectLocation({{.DisplayName | js}}, {{.Lat}}, {{.Lon}})">
+      {{.DisplayName}}
+    </button>
+  </li>
+  {{end}}
+</ul>
+{{end}}
+{{end}}

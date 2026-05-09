@@ -1,0 +1,69 @@
+{{define "chart"}}
+<section class="chart-section">
+  <h3>Brightness history{{if .PlaceName}} for {{.PlaceName}}{{end}}</h3>
+  <div id="chart-container"
+       hx-get="/chart?lat={{.Lat}}&lon={{.Lon}}&place={{.PlaceName}}"
+       hx-trigger="every 120s"
+       hx-swap="outerHTML">
+    <canvas id="brightness-chart" aria-label="Brightness history chart" role="img"></canvas>
+    <p id="chart-placeholder" class="chart-placeholder" hidden>
+      Run more analyses to build up chart history.
+    </p>
+  </div>
+</section>
+
+<script>
+(function () {
+  var rows = {{.DataJSON}};
+  var canvas = document.getElementById('brightness-chart');
+  var placeholder = document.getElementById('chart-placeholder');
+
+  if (!rows || rows.length < 2) {
+    if (canvas) canvas.hidden = true;
+    if (placeholder) placeholder.hidden = false;
+    return;
+  }
+
+  // Destroy any existing Chart instance on this canvas before re-creating,
+  // so HTMX swaps don't leave orphaned Chart.js objects.
+  if (canvas._chartInstance) {
+    canvas._chartInstance.destroy();
+  }
+
+  canvas._chartInstance = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: rows.map(function(r) { return r.analyzed_at; }),
+      datasets: [
+        {
+          label: 'Clear sky',
+          data: rows.map(function(r) { return r.clear_sky_nits; }),
+          tension: 0.3,
+          pointRadius: 4,
+        },
+        {
+          label: 'With clouds (OWM)',
+          data: rows.map(function(r) { return r.owm_nits; }),
+          tension: 0.3,
+          pointRadius: 4,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Analysis time' } },
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'Recommended nits' }
+        }
+      }
+    }
+  });
+}());
+</script>
+{{end}}

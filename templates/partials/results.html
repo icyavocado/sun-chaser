@@ -1,0 +1,55 @@
+{{define "results"}}
+<section class="results-section">
+  <h2>Results for {{.PlaceName}}</h2>
+  <p class="analyzed-at">Analyzed at {{.AnalyzedAt.Format "Mon Jan 2, 2006 15:04:05 MST"}}</p>
+  {{if .OWMWarning}}<p><mark>{{.OWMWarning}}</mark></p>{{end}}
+
+  <div class="grid model-grid">
+
+    <article class="model-card">
+      <header><strong>Clear-sky model</strong></header>
+      <dl>
+        <dt>Recommended</dt>
+        <dd>{{printf "%.0f" .ClearSky.RecommendedDisplayNits}} nits</dd>
+        <dt>Perceived</dt>
+        <dd>{{printf "%.0f" .ClearSky.PerceivedLuminance}} nits</dd>
+        <dt>Reflected</dt>
+        <dd>{{printf "%.1f" .ClearSky.ReflectedLuminance}} nits</dd>
+        <dt>Contrast ratio</dt>
+        <dd>{{printf "%.1f" .ClearSky.ContrastRatio}}:1</dd>
+        <dt>Glare warning</dt>
+        <dd>{{if .ClearSky.Glare}}<mark>Yes</mark>{{else}}No{{end}}</dd>
+      </dl>
+    </article>
+
+    <article class="model-card">
+      <header><strong>OWM-adjusted</strong></header>
+      <dl>
+        <dt>Recommended</dt>
+        <dd>{{printf "%.0f" .OWM.RecommendedDisplayNits}} nits</dd>
+        <dt>Perceived</dt>
+        <dd>{{printf "%.0f" .OWM.PerceivedLuminance}} nits</dd>
+        <dt>Reflected</dt>
+        <dd>{{printf "%.1f" .OWM.ReflectedLuminance}} nits</dd>
+        <dt>Contrast ratio</dt>
+        <dd>{{printf "%.1f" .OWM.ContrastRatio}}:1</dd>
+        <dt>Glare warning</dt>
+        <dd>{{if .OWM.Glare}}<mark>Yes</mark>{{else}}No{{end}}</dd>
+        <dt>Cloud cover</dt>
+        <dd>{{.CloudPercent}}%</dd>
+      </dl>
+    </article>
+
+  </div>
+
+  {{/* Chart is loaded immediately via hx-trigger="load" and then refreshed
+       every 120 s.  The /chart endpoint embeds pre-calculated JSON so the
+       browser never needs to make a second fetch. */}}
+  <div hx-get="/chart?lat={{.Lat}}&lon={{.Lon}}&place={{.PlaceName}}"
+       hx-trigger="load"
+       hx-swap="outerHTML">
+    <p aria-busy="true">Loading chart…</p>
+  </div>
+
+</section>
+{{end}}
