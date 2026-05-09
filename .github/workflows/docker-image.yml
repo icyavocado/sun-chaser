@@ -11,6 +11,8 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    env:
+      PARENT_WORKSPACE: ${{ github.workspace }}/..
 
     steps:
     - uses: actions/checkout@v4
@@ -21,8 +23,8 @@ jobs:
         path: calcbright
     - name: Prepare parent build context
       run: |
-        rm -rf ../calcbright
-        cp -a calcbright ../calcbright
+        rm -rf "$PARENT_WORKSPACE/calcbright"
+        cp -a calcbright "$PARENT_WORKSPACE/calcbright"
     - name: Build the Docker image
-      working-directory: ..
+      working-directory: ${{ env.PARENT_WORKSPACE }}
       run: docker build . --file sun-chaser/Dockerfile --tag my-image-name:$(date +%s)
