@@ -17,4 +17,4 @@ jobs:
     - name: Clone calcbright sibling module
       run: git clone --depth 1 https://github.com/icyavocado/calcbright ../calcbright
     - name: Build the Docker image
-      run: docker build .. --file Dockerfile --tag my-image-name:$(date +%s)
+      run: cd .. && docker build . --file sun-chaser/Dockerfile --tag my-image-name:$(date +%s)
