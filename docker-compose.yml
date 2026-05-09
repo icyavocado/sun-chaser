@@ -1,0 +1,25 @@
+services:
+  sun-chaser:
+    build:
+      # Context is the parent directory so the Go toolchain can reach both
+      # sun-chaser/ and the sibling calcbright/ module (replace directive).
+      context: ..
+      dockerfile: sun-chaser/Dockerfile
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      - OPENWEATHERMAP_API_KEY=${OPENWEATHERMAP_API_KEY}
+      - COLLECT_INTERVAL=${COLLECT_INTERVAL:-30m}
+      - DB_PATH=/app/data/sunchaser.db
+    volumes:
+      - sun-chaser-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  sun-chaser-data:
