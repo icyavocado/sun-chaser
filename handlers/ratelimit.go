@@ -73,11 +73,29 @@ func (rl *ipRateLimiter) cleanupLoop() {
 	}
 }
 
-// clientIP extracts the real client IP, honouring X-Forwarded-For.
-func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.SplitN(xff, ",", 2)
-		return strings.TrimSpace(parts[0])
+// clientIP extracts the real client IP from the request.
+//
+// When trustProxy is true (TRUST_PROXY=1 env var, set when running behind
+// Traefik/Nginx), X-Real-IP is preferred because Traefik sets it to the
+// original client IP. X-Forwarded-For is used as a fallback — only the
+// leftmost (client) entry is taken. Both values are validated as proper IP
+// addresses to prevent header-injection attacks.
+//
+// When trustProxy is false, RemoteAddr is used directly to prevent untrusted
+// callers from spoofing their apparent IP.
+func (h *Handler) clientIP(r *http.Request) string {
+	if h.trustProxy {
+		if xri := strings.TrimSpace(r.Header.Get("X-Real-IP")); xri != "" {
+			if ip := net.ParseIP(xri); ip != nil {
+				return ip.String()
+			}
+		}
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			first := strings.TrimSpace(strings.SplitN(xff, ",", 2)[0])
+			if ip := net.ParseIP(first); ip != nil {
+				return ip.String()
+			}
+		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {

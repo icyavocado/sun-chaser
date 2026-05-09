@@ -56,6 +56,11 @@ func (h *Handler) SolarIndex(w http.ResponseWriter, r *http.Request) {
 // SolarAnalyze runs the solar estimate, stores the result, and returns the
 // solar-results HTMX partial.
 func (h *Handler) SolarAnalyze(w http.ResponseWriter, r *http.Request) {
+	if !h.analyzeRL.Allow(h.clientIP(r)) {
+		http.Error(w, "rate limit exceeded — try again shortly", http.StatusTooManyRequests)
+		return
+	}
+
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "invalid form", http.StatusBadRequest)
 		return

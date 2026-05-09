@@ -36,6 +36,11 @@ func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
 // Analyze runs both brightness models, stores the result, and returns the
 // results HTMX partial.
 func (h *Handler) Analyze(w http.ResponseWriter, r *http.Request) {
+	if !h.analyzeRL.Allow(h.clientIP(r)) {
+		http.Error(w, "rate limit exceeded — try again shortly", http.StatusTooManyRequests)
+		return
+	}
+
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "invalid form", http.StatusBadRequest)
 		return

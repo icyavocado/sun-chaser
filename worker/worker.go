@@ -10,21 +10,46 @@ import (
 	"github.com/icyavocado/sun-chaser/solar"
 )
 
-// Worker periodically collects brightness data for all watched locations.
+// Worker periodically collects brightness data for all active watched locations.
 type Worker struct {
 	db                *db.DB
 	owmClient         *brightness.OWMClient
 	interval          time.Duration
 	calcbrightVersion string
+
+	// watchWindow is how far back we look when deciding which locations are
+	// still "active". Locations whose last user request is older than this
+	// are skipped until the user requests them again.
+	watchWindow time.Duration
+
+	// requestDelay is the pause inserted between consecutive OWM calls within
+	// a single collection batch, to avoid hitting the rate limit in a burst.
+	requestDelay time.Duration
+
+	// Circuit-breaker state — all fields are accessed only from the single
+	// goroutine that calls collect(), so no mutex is needed.
+	owmConsecFailBatches int // consecutive batches where every OWM call failed
+	skipCycles           int // remaining collect() ticks to skip
+	backoffStep          int // next skip length (doubles on each open: 1, 2, 4…)
 }
 
-// New creates a Worker with the given collection interval.
-func New(database *db.DB, owmClient *brightness.OWMClient, interval time.Duration, calcbrightVersion string) *Worker {
+// New creates a Worker with the given collection interval and OWM spacing.
+func New(
+	database *db.DB,
+	owmClient *brightness.OWMClient,
+	interval time.Duration,
+	calcbrightVersion string,
+	watchWindow time.Duration,
+	requestDelay time.Duration,
+) *Worker {
 	return &Worker{
 		db:                database,
 		owmClient:         owmClient,
 		interval:          interval,
 		calcbrightVersion: calcbrightVersion,
+		watchWindow:       watchWindow,
+		requestDelay:      requestDelay,
+		backoffStep:       1,
 	}
 }
 
@@ -47,21 +72,66 @@ func (w *Worker) Run(ctx context.Context) {
 }
 
 func (w *Worker) collect(ctx context.Context) {
-	locations, err := w.db.WatchedLocations()
+	// Circuit breaker: skip this cycle if we're in a backoff window.
+	if w.skipCycles > 0 {
+		w.skipCycles--
+		log.Printf("worker: OWM circuit breaker open — skipping collection (%d cycle(s) remaining)", w.skipCycles)
+		return
+	}
+
+	since := time.Now().Add(-w.watchWindow)
+	locations, err := w.db.ActiveWatchedLocations(since)
 	if err != nil {
-		log.Printf("worker: list watched locations: %v", err)
+		log.Printf("worker: list active watched locations: %v", err)
 		return
 	}
 	if len(locations) == 0 {
 		return
 	}
-	log.Printf("worker: collecting %d location(s)", len(locations))
-	for _, loc := range locations {
+	log.Printf("worker: collecting %d active location(s)", len(locations))
+
+	owmSuccesses := 0
+
+	for i, loc := range locations {
 		if ctx.Err() != nil {
 			return
 		}
-		if err := w.analyzeLocation(ctx, loc); err != nil {
+
+		owmOK, err := w.analyzeLocation(ctx, loc)
+		if err != nil {
 			log.Printf("worker: analyze %s: %v", loc.PlaceName, err)
+		}
+		if owmOK {
+			owmSuccesses++
+		}
+
+		// Space out OWM calls — skip the delay after the last location.
+		if i < len(locations)-1 && w.requestDelay > 0 {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(w.requestDelay):
+			}
+		}
+	}
+
+	// Update circuit-breaker state.
+	if owmSuccesses > 0 {
+		// At least one OWM call succeeded — reset the breaker.
+		if w.owmConsecFailBatches > 0 {
+			log.Printf("worker: OWM recovered — resetting circuit breaker")
+		}
+		w.owmConsecFailBatches = 0
+		w.backoffStep = 1
+	} else {
+		// Every OWM call in this batch failed.
+		w.owmConsecFailBatches++
+		log.Printf("worker: OWM failed for all locations (%d consecutive batch(es))", w.owmConsecFailBatches)
+		if w.owmConsecFailBatches >= 3 {
+			w.skipCycles = w.backoffStep
+			log.Printf("worker: OWM circuit breaker tripped — pausing for %d cycle(s)", w.skipCycles)
+			w.backoffStep *= 2
+			w.owmConsecFailBatches = 0
 		}
 	}
 }
@@ -77,7 +147,9 @@ const (
 	fallbackCloudFrac  = 0.5
 )
 
-func (w *Worker) analyzeLocation(ctx context.Context, wl db.WatchedLocation) error {
+// analyzeLocation runs the full brightness + solar estimate for one location.
+// It returns owmOK=true when OWM data was successfully fetched (not a fallback).
+func (w *Worker) analyzeLocation(ctx context.Context, wl db.WatchedLocation) (owmOK bool, err error) {
 	now := time.Now()
 	loc := brightness.Location{Lat: wl.Lat, Lon: wl.Lon, AltMeters: defaultAlt}
 	orient := brightness.Orientation{AzimuthDeg: defaultAz, TiltDeg: defaultTilt}
@@ -87,12 +159,10 @@ func (w *Worker) analyzeLocation(ctx context.Context, wl db.WatchedLocation) err
 	// Clear-sky model.
 	clearReport, err := brightness.AnalyzeWithValues(now, loc, orient, dev, env, 120, 0, 0, 0)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// OWM-adjusted model with graceful fallback.
-	// Persist raw OWM conditions before running the calculation so the exact
-	// weather inputs are always stored regardless of the calcbright version.
 	cloudFrac := fallbackCloudFrac
 	obsParams := db.OWMObservationParams{
 		Lat:        wl.Lat,
@@ -107,6 +177,7 @@ func (w *Worker) analyzeLocation(ctx context.Context, wl db.WatchedLocation) err
 		log.Printf("worker: OWM unavailable for %s: %v — using %.0f%% cloud fallback",
 			wl.PlaceName, owmErr, fallbackCloudFrac*100)
 	} else {
+		owmOK = true
 		cloudFrac = float64(owmData.Clouds) / 100.0
 		obsParams.Clouds = owmData.Clouds
 		obsParams.Uvi = owmData.Uvi
@@ -125,13 +196,13 @@ func (w *Worker) analyzeLocation(ctx context.Context, wl db.WatchedLocation) err
 
 	dni, dhi, ghi, err := brightness.ClearSkyIrradiance(now, loc)
 	if err != nil {
-		return err
+		return owmOK, err
 	}
 	dniA, dhiA, ghiA := brightness.ApplyCloudAttenuation(dni, dhi, ghi, cloudFrac)
 
 	owmReport, err := brightness.AnalyzeWithValues(now, loc, orient, dev, env, 120, dniA, dhiA, ghiA)
 	if err != nil {
-		return err
+		return owmOK, err
 	}
 	owmReport.DataSource = "owm"
 
@@ -162,7 +233,7 @@ func (w *Worker) analyzeLocation(ctx context.Context, wl db.WatchedLocation) err
 		AltMeters:          defaultAlt,
 	})
 	if err != nil {
-		return err
+		return owmOK, err
 	}
 
 	// --- Solar estimate for this location ---
@@ -171,7 +242,7 @@ func (w *Worker) analyzeLocation(ctx context.Context, wl db.WatchedLocation) err
 	if solarErr != nil {
 		// Non-fatal: log and continue so brightness data is still stored.
 		log.Printf("worker: solar estimate for %s: %v", wl.PlaceName, solarErr)
-		return nil
+		return owmOK, nil
 	}
 
 	_, err = w.db.InsertSolar(db.SolarInsertParams{
@@ -194,5 +265,5 @@ func (w *Worker) analyzeLocation(ctx context.Context, wl db.WatchedLocation) err
 		CalcbrightVersion: w.calcbrightVersion,
 		OWMObservationID:  obsID,
 	})
-	return err
+	return owmOK, err
 }

@@ -26,6 +26,8 @@ type Handler struct {
 	owmClient         *brightness.OWMClient
 	photonBase        string
 	geocodeRL         *ipRateLimiter
+	analyzeRL         *ipRateLimiter
+	trustProxy        bool
 	tmpls             map[string]*template.Template
 	calcbrightVersion string
 }
@@ -33,12 +35,14 @@ type Handler struct {
 // New constructs a Handler, parses all templates, and wires up shared state.
 // owmClient and calcbrightVersion are created in main and shared with the
 // background worker so both use the same cache and version label.
-func New(database *db.DB, owmClient *brightness.OWMClient, photonBase, calcbrightVersion string) *Handler {
+func New(database *db.DB, owmClient *brightness.OWMClient, photonBase, calcbrightVersion string, trustProxy bool) *Handler {
 	h := &Handler{
 		db:                database,
 		owmClient:         owmClient,
 		photonBase:        photonBase,
 		geocodeRL:         newIPRateLimiter(10, time.Minute),
+		analyzeRL:         newIPRateLimiter(5, time.Minute),
+		trustProxy:        trustProxy,
 		tmpls:             make(map[string]*template.Template),
 		calcbrightVersion: calcbrightVersion,
 	}

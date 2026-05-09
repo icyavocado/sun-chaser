@@ -38,7 +38,7 @@ type Suggestion struct {
 
 // Geocode proxies a query to Photon and returns the suggestions partial.
 func (h *Handler) Geocode(w http.ResponseWriter, r *http.Request) {
-	if !h.geocodeRL.Allow(clientIP(r)) {
+	if !h.geocodeRL.Allow(h.clientIP(r)) {
 		http.Error(w, "rate limit exceeded — try again shortly", http.StatusTooManyRequests)
 		return
 	}

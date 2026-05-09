@@ -184,7 +184,7 @@ CREATE INDEX IF NOT EXISTS idx_solar_analyses_location
     ON solar_analyses (ROUND(lat, 2), ROUND(lon, 2));
 `
 
-// newColumns are added to the analyses table via ALTER TABLE when they don't
+// newColumns are added to existing tables via ALTER TABLE when they don't
 // exist yet.  SQLite returns "duplicate column name" if the column is already
 // present; we treat that as a no-op so the migration is idempotent.
 var newColumns = []string{
@@ -195,6 +195,9 @@ var newColumns = []string{
 	`ALTER TABLE analyses ADD COLUMN display_nits       REAL`,
 	`ALTER TABLE analyses ADD COLUMN reflectance        REAL`,
 	`ALTER TABLE analyses ADD COLUMN alt_meters         REAL`,
+	// Track when a location was last user-requested so the worker can pause
+	// inactive locations after the watch window expires.
+	`ALTER TABLE watched_locations ADD COLUMN last_requested_at DATETIME`,
 }
 
 func (db *DB) migrate() error {
@@ -306,19 +309,47 @@ func (db *DB) ForLocation(lat, lon float64) ([]AnalysisRow, error) {
 
 // UpsertWatchedLocation inserts or replaces the watched location for the
 // grid cell containing (lat, lon) rounded to 2 decimal places.
+// last_requested_at is always stamped to now so the worker knows this
+// location is still actively used and should not be paused.
 func (db *DB) UpsertWatchedLocation(placeName string, lat, lon float64) error {
 	latGrid := roundGrid(lat)
 	lonGrid := roundGrid(lon)
 	_, err := db.sql.Exec(`
-		INSERT INTO watched_locations (lat_grid, lon_grid, place_name, lat, lon)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO watched_locations (lat_grid, lon_grid, place_name, lat, lon, last_requested_at)
+		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT(lat_grid, lon_grid) DO UPDATE SET
-			place_name = excluded.place_name,
-			lat        = excluded.lat,
-			lon        = excluded.lon`,
+			place_name        = excluded.place_name,
+			lat               = excluded.lat,
+			lon               = excluded.lon,
+			last_requested_at = CURRENT_TIMESTAMP`,
 		latGrid, lonGrid, placeName, lat, lon,
 	)
 	return err
+}
+
+// ActiveWatchedLocations returns locations whose last user request was at or
+// after since. Rows with a NULL last_requested_at (locations registered before
+// this column was added) are always included until they age out naturally.
+func (db *DB) ActiveWatchedLocations(since time.Time) ([]WatchedLocation, error) {
+	rows, err := db.sql.Query(`
+		SELECT place_name, lat, lon FROM watched_locations
+		WHERE last_requested_at IS NULL OR last_requested_at >= ?`,
+		since.UTC().Format(time.RFC3339),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []WatchedLocation
+	for rows.Next() {
+		var w WatchedLocation
+		if err := rows.Scan(&w.PlaceName, &w.Lat, &w.Lon); err != nil {
+			return nil, err
+		}
+		result = append(result, w)
+	}
+	return result, rows.Err()
 }
 
 // WatchedLocations returns all locations registered for background collection.

@@ -109,6 +109,32 @@ func main() {
 		}
 	}
 
+	// watchWindow is how long since a user last requested a location before
+	// the worker pauses collecting for it (default 60 days).
+	watchWindow := 60 * 24 * time.Hour
+	if v := os.Getenv("WATCH_WINDOW"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			watchWindow = d
+		} else {
+			log.Printf("invalid WATCH_WINDOW %q, using 1440h (60 days)", v)
+		}
+	}
+
+	// requestDelay spaces out OWM calls within a batch to avoid bursting the
+	// free-tier rate limit (default 2s → ~30 calls/min for a 10-location batch).
+	requestDelay := 2 * time.Second
+	if v := os.Getenv("WORKER_REQUEST_DELAY"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			requestDelay = d
+		} else {
+			log.Printf("invalid WORKER_REQUEST_DELAY %q, using 2s", v)
+		}
+	}
+
+	// trustProxy controls whether X-Real-IP / X-Forwarded-For headers are
+	// trusted for rate-limit IP extraction. Enable when behind Traefik/Nginx.
+	trustProxy := os.Getenv("TRUST_PROXY") == "1" || os.Getenv("TRUST_PROXY") == "true"
+
 	database, err := db.Open(dbPath)
 	if err != nil {
 		log.Fatalf("db: %v", err)
@@ -122,11 +148,13 @@ func main() {
 	// worker so they hit the same in-memory cache.
 	owmClient := brightness.NewOWMClient(owmKey, 10*time.Minute, 5*time.Second)
 
-	h := handlers.New(database, owmClient, photonBase, cbVersion)
+	h := handlers.New(database, owmClient, photonBase, cbVersion, trustProxy)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(middleware.Timeout(30 * time.Second))
+	r.Use(handlers.SecurityHeaders)
 
 	r.Get("/", h.Index)
 	r.Get("/geocode", h.Geocode)
@@ -142,7 +170,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	w := worker.New(database, owmClient, collectInterval, cbVersion)
+	w := worker.New(database, owmClient, collectInterval, cbVersion, watchWindow, requestDelay)
 	go w.Run(ctx)
 
 	srv := &http.Server{Addr: ":" + port, Handler: r}
