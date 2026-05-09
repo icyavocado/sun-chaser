@@ -7,6 +7,7 @@ import (
 
 	"github.com/icyavocado/calcbright/brightness"
 	"github.com/icyavocado/sun-chaser/db"
+	"github.com/icyavocado/sun-chaser/solar"
 )
 
 // Worker periodically collects brightness data for all watched locations.
@@ -159,6 +160,39 @@ func (w *Worker) analyzeLocation(ctx context.Context, wl db.WatchedLocation) err
 		DisplayNits:        defaultDisplayNits,
 		Reflectance:        defaultReflectance,
 		AltMeters:          defaultAlt,
+	})
+	if err != nil {
+		return err
+	}
+
+	// --- Solar estimate for this location ---
+	panel := solar.DefaultPanel(wl.Lat)
+	solarReport, solarErr := solar.Estimate(now, loc, panel, cloudFrac)
+	if solarErr != nil {
+		// Non-fatal: log and continue so brightness data is still stored.
+		log.Printf("worker: solar estimate for %s: %v", wl.PlaceName, solarErr)
+		return nil
+	}
+
+	_, err = w.db.InsertSolar(db.SolarInsertParams{
+		PlaceName:         wl.PlaceName,
+		Lat:               wl.Lat,
+		Lon:               wl.Lon,
+		PanelArea:         panel.AreaM2,
+		PanelEfficiency:   panel.Efficiency,
+		PanelPR:           panel.PR,
+		PanelAz:           panel.AzDeg,
+		PanelTilt:         panel.TiltDeg,
+		ClearPOAWm2:       solarReport.ClearPOA,
+		ClearPowerW:       solarReport.ClearPowerW,
+		ClearDailyKWh:     solarReport.ClearDailyKWh,
+		OWMPOAWm2:         solarReport.OWMPOA,
+		OWMPowerW:         solarReport.OWMPowerW,
+		OWMDailyKWh:       solarReport.OWMDailyKWh,
+		CloudFraction:     cloudFrac,
+		SunZenithDeg:      sunZenith,
+		CalcbrightVersion: w.calcbrightVersion,
+		OWMObservationID:  obsID,
 	})
 	return err
 }

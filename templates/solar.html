@@ -1,0 +1,159 @@
+{{define "content"}}
+<form id="solar-form"
+      hx-post="/solar/analyze"
+      hx-target="#solar-results"
+      hx-swap="innerHTML"
+      hx-indicator="#solar-btn">
+
+  <fieldset>
+    <legend>Location</legend>
+    <div class="autocomplete-wrapper">
+      <input type="search"
+             id="location-input"
+             placeholder="Search for a city or place..."
+             autocomplete="off"
+             hx-get="/geocode"
+             hx-trigger="keyup[this.value.length > 2] delay:500ms"
+             hx-target="#suggestions"
+             hx-include="[name='q']"
+             name="q"
+             oninput="handleLocationInput(this)">
+      <div id="suggestions" class="suggestions-dropdown" role="listbox"></div>
+    </div>
+    <input type="hidden" id="lat"        name="lat">
+    <input type="hidden" id="lon"        name="lon">
+    <input type="hidden" id="place-name" name="place_name">
+  </fieldset>
+
+  <fieldset>
+    <legend>Panel specification</legend>
+    <div class="grid">
+      <label>
+        Area (m²)
+        <input type="number" id="panel-area" name="area" value="1.70" min="0.1" max="100" step="0.1">
+        <small>Typical single panel ≈ 1.7 m²</small>
+      </label>
+      <label>
+        Efficiency (%)
+        <input type="number" id="panel-efficiency" name="efficiency" value="18" min="1" max="50" step="0.1">
+        <small>Mid-range monocrystalline ≈ 18%</small>
+      </label>
+      <label>
+        Performance ratio
+        <input type="number" id="panel-pr" name="pr" value="0.80" min="0.1" max="1" step="0.01">
+        <small>Wiring, inverter, temperature losses</small>
+      </label>
+    </div>
+    <div class="grid">
+      <label>
+        Azimuth (° from North)
+        <input type="number" id="panel-az" name="az" value="180" min="0" max="360">
+        <small>180 = south-facing (N hemisphere)</small>
+      </label>
+      <label>
+        Tilt (° from horizontal)
+        <input type="number" id="panel-tilt" name="tilt" value="45" min="0" max="90">
+        <small>Optimal ≈ latitude angle</small>
+      </label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Economics</legend>
+    <div class="grid">
+      <label>
+        Electricity rate ($/kWh)
+        <input type="number" id="electricity-rate" name="electricity_rate" value="0.13" min="0.01" max="2" step="0.01">
+        <small>Check your utility bill</small>
+      </label>
+      <label>
+        Monthly usage
+        <input type="number" id="monthly-usage" name="monthly_usage" value="900" min="10" max="10000" step="10">
+        <small>kWh/month — typical home ≈ 900</small>
+      </label>
+      <label>
+        System cost ($)
+        <input type="number" id="installation-cost" name="installation_cost" value="15000" min="100" step="100">
+        <small>Total installed cost incl. inverter</small>
+      </label>
+    </div>
+    <div class="grid">
+      <label>
+        Storage days desired
+        <input type="number" id="storage-days" name="storage_days" value="1" min="0" max="7" step="0.5">
+        <small>Days of backup battery storage</small>
+      </label>
+      <label>
+        Battery cost ($/kWh capacity)
+        <input type="number" id="battery-per-kwh" name="battery_per_kwh" value="400" min="50" max="2000" step="10">
+        <small>Lithium ≈ $300–500/kWh installed</small>
+      </label>
+    </div>
+  </fieldset>
+
+  <button type="submit" id="solar-btn" aria-busy="false">Estimate</button>
+</form>
+
+<div id="solar-results"></div>
+
+<script>
+  var LOCATION_KEY = 'sun-chaser:location';
+  let _locationConfirmed = false;
+
+  window.addEventListener('DOMContentLoaded', function () {
+    try {
+      var saved = JSON.parse(localStorage.getItem(LOCATION_KEY));
+      if (saved && saved.name && saved.lat != null && saved.lon != null) {
+        document.getElementById('location-input').value = saved.name;
+        document.getElementById('lat').value = saved.lat;
+        document.getElementById('lon').value = saved.lon;
+        document.getElementById('place-name').value = saved.name;
+        _locationConfirmed = true;
+        // Apply optimal panel orientation for restored location.
+        applyPanelOrientation(parseFloat(saved.lat));
+      }
+    } catch (e) {}
+  });
+
+  function handleLocationInput(el) {
+    if (_locationConfirmed) {
+      document.getElementById('lat').value = '';
+      document.getElementById('lon').value = '';
+      document.getElementById('place-name').value = '';
+      _locationConfirmed = false;
+    }
+    if (el.value.length <= 2) {
+      document.getElementById('suggestions').innerHTML = '';
+    }
+  }
+
+  function applyPanelOrientation(latNum) {
+    document.getElementById('panel-az').value   = latNum >= 0 ? 180 : 0;
+    document.getElementById('panel-tilt').value = Math.abs(latNum).toFixed(1);
+  }
+
+  function selectLocation(name, lat, lon) {
+    try {
+      localStorage.setItem(LOCATION_KEY, JSON.stringify({name: name, lat: lat, lon: lon}));
+    } catch (e) {}
+    document.getElementById('location-input').value = name;
+    document.getElementById('lat').value = lat;
+    document.getElementById('lon').value = lon;
+    document.getElementById('place-name').value = name;
+    document.getElementById('suggestions').innerHTML = '';
+    _locationConfirmed = true;
+    applyPanelOrientation(parseFloat(lat));
+  }
+
+  document.addEventListener('htmx:beforeRequest', function(e) {
+    if (e.detail.elt.id === 'solar-form') {
+      document.getElementById('solar-btn').setAttribute('aria-busy', 'true');
+    }
+  });
+  document.addEventListener('htmx:afterRequest', function(e) {
+    if (e.detail.elt.id === 'solar-form') {
+      document.getElementById('solar-btn').setAttribute('aria-busy', 'false');
+    }
+  });
+</script>
+{{end}}

@@ -1,0 +1,63 @@
+{{define "solar-chart"}}
+<section id="solar-chart-container" class="chart-section"
+         hx-get="/solar-chart?lat={{.Lat}}&lon={{.Lon}}&place={{.PlaceName}}"
+         hx-trigger="every 120s"
+         hx-swap="outerHTML">
+  <h3>Solar history{{if .PlaceName}} for {{.PlaceName}}{{end}}</h3>
+  <canvas id="solar-history-chart" aria-label="Solar history chart" role="img"></canvas>
+  <p id="solar-chart-placeholder" class="chart-placeholder" hidden>
+    Run more estimates to build up chart history.
+  </p>
+</section>
+
+<script>
+(function () {
+  var rows = {{.DataJSON}};
+  var canvas = document.getElementById('solar-history-chart');
+  var placeholder = document.getElementById('solar-chart-placeholder');
+
+  if (!rows || rows.length < 2) {
+    if (canvas) canvas.hidden = true;
+    if (placeholder) placeholder.hidden = false;
+    return;
+  }
+
+  if (canvas._chartInstance) { canvas._chartInstance.destroy(); }
+
+  canvas._chartInstance = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: rows.map(function(r) { return r.analyzed_at; }),
+      datasets: [
+        {
+          label: 'Clear sky (kWh/day)',
+          data: rows.map(function(r) { return r.clear_daily_kwh; }),
+          tension: 0.3,
+          pointRadius: 4,
+        },
+        {
+          label: 'With clouds (kWh/day)',
+          data: rows.map(function(r) { return r.owm_daily_kwh; }),
+          tension: 0.3,
+          pointRadius: 4,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Analysis time' } },
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'kWh / day' }
+        }
+      }
+    }
+  });
+}());
+</script>
+{{end}}

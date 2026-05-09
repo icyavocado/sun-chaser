@@ -1,0 +1,195 @@
+{{define "solar-results"}}
+<section class="results-section">
+  <h2>Solar estimate for {{.PlaceName}}</h2>
+  <p class="analyzed-at">Estimated at {{.AnalyzedAt.Format "Mon Jan 2, 2006 15:04:05 MST"}}</p>
+  <p class="analyzed-at">
+    Panel: {{printf "%.2f" .Panel.AreaM2}} m²
+    &middot; {{printf "%.0f" (mul .Panel.Efficiency 100)}}% efficiency
+    &middot; PR {{printf "%.2f" .Panel.PR}}
+    &middot; {{printf "%.0f" .Panel.AzDeg}}° az
+    &middot; {{printf "%.1f" .Panel.TiltDeg}}° tilt
+  </p>
+  {{if .OWMWarning}}<p><mark>{{.OWMWarning}}</mark></p>{{end}}
+
+  <div class="grid model-grid">
+
+    <article class="model-card">
+      <header><strong>Clear-sky</strong></header>
+      <dl>
+        <dt>POA irradiance</dt>
+        <dd>{{printf "%.0f" .Report.ClearPOA}} W/m²</dd>
+        <dt>Power now</dt>
+        <dd>{{printf "%.1f" .Report.ClearPowerW}} W</dd>
+        <dt>Daily estimate</dt>
+        <dd>{{printf "%.3f" .Report.ClearDailyKWh}} kWh</dd>
+      </dl>
+    </article>
+
+    <article class="model-card">
+      <header><strong>OWM-adjusted</strong></header>
+      <dl>
+        <dt>POA irradiance</dt>
+        <dd>{{printf "%.0f" .Report.OWMPOA}} W/m²</dd>
+        <dt>Power now</dt>
+        <dd>{{printf "%.1f" .Report.OWMPowerW}} W</dd>
+        <dt>Daily estimate</dt>
+        <dd>{{printf "%.3f" .Report.OWMDailyKWh}} kWh</dd>
+        <dt>Cloud cover</dt>
+        <dd>{{.CloudPercent}}%</dd>
+      </dl>
+    </article>
+
+  </div>
+
+  {{/* ── Financial / practical estimates ──────────────────────────────── */}}
+  <section class="financial-section">
+    <h3>Practical estimates</h3>
+    <p class="analyzed-at">
+      Based on {{.PanelsNeeded}} panel(s) to cover
+      {{printf "%.0f" .MonthlyUsage}} kWh/month
+      at ${{printf "%.2f" .ElectricityRate}}/kWh
+    </p>
+
+    <div class="grid model-grid">
+
+      <article class="model-card">
+        <header><strong>Monthly savings</strong></header>
+        <dl>
+          <dt>Production</dt>
+          <dd>{{printf "%.0f" .MonthlyProductionKWh}} kWh/month</dd>
+          <dt>Savings</dt>
+          <dd>${{printf "%.0f" .MonthlySavings}}/month</dd>
+          <dt>Annual savings</dt>
+          <dd>${{printf "%.0f" .AnnualSavings}}/year</dd>
+        </dl>
+      </article>
+
+      <article class="model-card">
+        <header><strong>Break-even</strong></header>
+        <dl>
+          <dt>System cost</dt>
+          <dd>${{printf "%.0f" .InstallationCost}}</dd>
+          <dt>Break-even</dt>
+          <dd>
+            {{if isInf .BreakEvenYears}}
+              N/A — no sunlight income
+            {{else}}
+              {{printf "%.1f" .BreakEvenYears}} years
+            {{end}}
+          </dd>
+        </dl>
+      </article>
+
+      <article class="model-card">
+        <header><strong>Panels needed</strong></header>
+        <dl>
+          <dt>Panels</dt>
+          <dd>{{.PanelsNeeded}}</dd>
+          <dt>Daily per panel</dt>
+          <dd>{{printf "%.3f" .Report.OWMDailyKWh}} kWh</dd>
+          <dt>Total daily</dt>
+          <dd>{{printf "%.1f" (mulInt .Report.OWMDailyKWh .PanelsNeeded)}} kWh</dd>
+        </dl>
+      </article>
+
+    </div>
+
+    <div class="grid model-grid">
+
+      <article class="model-card">
+        <header><strong>Winter estimate</strong></header>
+        <dl>
+          <dt>Clear-sky daily</dt>
+          <dd>{{printf "%.3f" .WinterReport.ClearDailyKWh}} kWh/panel</dd>
+          <dt>With clouds daily</dt>
+          <dd>{{printf "%.3f" .WinterReport.OWMDailyKWh}} kWh/panel</dd>
+          <dt>{{.PanelsNeeded}} panels (cloudy)</dt>
+          <dd>{{printf "%.2f" (mulInt .WinterReport.OWMDailyKWh .PanelsNeeded)}} kWh/day</dd>
+        </dl>
+      </article>
+
+      <article class="model-card">
+        <header><strong>Battery storage</strong></header>
+        <dl>
+          <dt>Storage ({{printf "%.1f" .StorageDays}} day(s))</dt>
+          <dd>{{printf "%.1f" .StorageCapacityKWh}} kWh capacity</dd>
+          <dt>Est. battery cost</dt>
+          <dd>${{printf "%.0f" .StorageCost}}</dd>
+          <dt>Rate used</dt>
+          <dd>${{printf "%.0f" .BatteryPerKWh}}/kWh</dd>
+        </dl>
+      </article>
+
+    </div>
+
+    <p class="analyzed-at"><small>These are order-of-magnitude estimates only. Consult a qualified installer for accurate sizing and costs. The irradiance model runs ~20–30% optimistic vs real-world conditions.</small></p>
+  </section>
+
+  {{/* Daily power profile — inline, computed at request time, not polled. */}}
+  <section class="chart-section">
+    <h3>Daily power profile for {{.PlaceName}}</h3>
+    <canvas id="solar-profile-chart" aria-label="Daily solar power profile chart" role="img"></canvas>
+    <p id="solar-profile-placeholder" class="chart-placeholder" hidden>
+      No daylight hours computed — location may be in polar night.
+    </p>
+  </section>
+
+  {{/* Historical kWh chart — loaded via HTMX then polled every 120 s. */}}
+  <div hx-get="/solar-chart?lat={{.Lat}}&lon={{.Lon}}&place={{.PlaceName}}"
+       hx-trigger="load"
+       hx-swap="outerHTML">
+    <p aria-busy="true">Loading solar history chart…</p>
+  </div>
+
+</section>
+
+<script>
+(function () {
+  var rows = {{.HourlyDataJSON}};
+  var canvas = document.getElementById('solar-profile-chart');
+  var placeholder = document.getElementById('solar-profile-placeholder');
+
+  var hasDaylight = rows && rows.some(function(r) { return r.ClearPowerW > 0; });
+  if (!hasDaylight) {
+    if (canvas) canvas.hidden = true;
+    if (placeholder) placeholder.hidden = false;
+    return;
+  }
+
+  if (canvas._chartInstance) { canvas._chartInstance.destroy(); }
+
+  canvas._chartInstance = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: rows.map(function(r) { return r.Hour + ':00'; }),
+      datasets: [
+        {
+          label: 'Clear sky (W)',
+          data: rows.map(function(r) { return r.ClearPowerW; }),
+          borderRadius: 2,
+        },
+        {
+          label: 'With clouds (W)',
+          data: rows.map(function(r) { return r.OWMPowerW; }),
+          borderRadius: 2,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Hour (UTC)' } },
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'Power (W)' }
+        }
+      }
+    }
+  });
+}());
+</script>
+{{end}}

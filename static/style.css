@@ -33,12 +33,12 @@
   text-align: left;
   padding: 0.5rem 0.75rem;
   margin: 0;
-  border: none;
   border-radius: 0;
   background: transparent;
   cursor: pointer;
   font-size: 0.9rem;
   color: var(--pico-color);
+  text-decoration: none;
 }
 
 .suggestion-btn:hover,
@@ -46,6 +46,7 @@
   background: var(--pico-primary-hover-background);
   color: var(--pico-primary-inverse);
   outline: none;
+  text-decoration: none;
 }
 
 /* ── Site header ───────────────────────────────────────────────────── */
@@ -90,11 +91,14 @@
   color: var(--pico-muted-color);
   font-size: 0.85rem;
   white-space: nowrap;
+  min-width: 0;
 }
 
 .model-card dd {
   margin: 0;
   font-weight: 600;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 /* ── Chart ─────────────────────────────────────────────────────────── */

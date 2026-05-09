@@ -155,6 +155,33 @@ CREATE TABLE IF NOT EXISTS watched_locations (
     lon        REAL    NOT NULL,
     UNIQUE (lat_grid, lon_grid)
 );
+
+-- solar_analyses stores panel power estimates (separate from brightness analyses).
+CREATE TABLE IF NOT EXISTS solar_analyses (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    place_name          TEXT    NOT NULL,
+    lat                 REAL    NOT NULL,
+    lon                 REAL    NOT NULL,
+    analyzed_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    panel_area          REAL,
+    panel_efficiency    REAL,
+    panel_pr            REAL,
+    panel_az            REAL,
+    panel_tilt          REAL,
+    clear_poa_wm2       REAL,
+    clear_power_w       REAL,
+    clear_daily_kwh     REAL,
+    owm_poa_wm2         REAL,
+    owm_power_w         REAL,
+    owm_daily_kwh       REAL,
+    cloud_fraction      REAL,
+    sun_zenith_deg      REAL,
+    calcbright_version  TEXT,
+    owm_observation_id  INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_solar_analyses_location
+    ON solar_analyses (ROUND(lat, 2), ROUND(lon, 2));
 `
 
 // newColumns are added to the analyses table via ALTER TABLE when they don't
@@ -339,4 +366,98 @@ func boolToInt(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+// SolarInsertParams carries the values for a new solar_analyses row.
+type SolarInsertParams struct {
+	PlaceName         string
+	Lat               float64
+	Lon               float64
+	PanelArea         float64
+	PanelEfficiency   float64
+	PanelPR           float64
+	PanelAz           float64
+	PanelTilt         float64
+	ClearPOAWm2       float64
+	ClearPowerW       float64
+	ClearDailyKWh     float64
+	OWMPOAWm2         float64
+	OWMPowerW         float64
+	OWMDailyKWh       float64
+	CloudFraction     float64
+	SunZenithDeg      float64
+	CalcbrightVersion string
+	OWMObservationID  int64 // 0 when not linked
+}
+
+// InsertSolar stores one solar analysis run and returns its assigned ID.
+func (db *DB) InsertSolar(p SolarInsertParams) (int64, error) {
+	var obsID any
+	if p.OWMObservationID != 0 {
+		obsID = p.OWMObservationID
+	}
+	res, err := db.sql.Exec(`
+		INSERT INTO solar_analyses (
+			place_name, lat, lon, analyzed_at,
+			panel_area, panel_efficiency, panel_pr, panel_az, panel_tilt,
+			clear_poa_wm2, clear_power_w, clear_daily_kwh,
+			owm_poa_wm2, owm_power_w, owm_daily_kwh,
+			cloud_fraction, sun_zenith_deg,
+			calcbright_version, owm_observation_id
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.PlaceName, p.Lat, p.Lon, time.Now().UTC().Format(time.RFC3339),
+		sanitize(p.PanelArea), sanitize(p.PanelEfficiency), sanitize(p.PanelPR),
+		sanitize(p.PanelAz), sanitize(p.PanelTilt),
+		sanitize(p.ClearPOAWm2), sanitize(p.ClearPowerW), sanitize(p.ClearDailyKWh),
+		sanitize(p.OWMPOAWm2), sanitize(p.OWMPowerW), sanitize(p.OWMDailyKWh),
+		sanitize(p.CloudFraction), sanitize(p.SunZenithDeg),
+		p.CalcbrightVersion, obsID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// SolarRow is a single stored solar analysis result (for chart/history).
+type SolarRow struct {
+	ID            int64
+	PlaceName     string
+	Lat           float64
+	Lon           float64
+	AnalyzedAt    time.Time
+	ClearDailyKWh float64
+	OWMDailyKWh   float64
+}
+
+// ForLocationSolar returns all solar analyses for a location rounded to 2
+// decimal places, ordered oldest first (for chart display).
+func (db *DB) ForLocationSolar(lat, lon float64) ([]SolarRow, error) {
+	rows, err := db.sql.Query(`
+		SELECT id, place_name, lat, lon, analyzed_at, clear_daily_kwh, owm_daily_kwh
+		FROM solar_analyses
+		WHERE ROUND(lat, 2) = ROUND(?, 2)
+		  AND ROUND(lon, 2) = ROUND(?, 2)
+		ORDER BY analyzed_at ASC`,
+		lat, lon,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []SolarRow
+	for rows.Next() {
+		var r SolarRow
+		var analyzedAt string
+		if err := rows.Scan(&r.ID, &r.PlaceName, &r.Lat, &r.Lon, &analyzedAt,
+			&r.ClearDailyKWh, &r.OWMDailyKWh); err != nil {
+			return nil, err
+		}
+		if t, err := time.Parse(time.RFC3339, analyzedAt); err == nil {
+			r.AnalyzedAt = t
+		}
+		result = append(result, r)
+	}
+	return result, rows.Err()
 }

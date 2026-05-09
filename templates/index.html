@@ -67,7 +67,21 @@
 </div>
 
 <script>
+  var LOCATION_KEY = 'sun-chaser:location';
   let _locationConfirmed = false;
+
+  window.addEventListener('DOMContentLoaded', function () {
+    try {
+      var saved = JSON.parse(localStorage.getItem(LOCATION_KEY));
+      if (saved && saved.name && saved.lat != null && saved.lon != null) {
+        document.getElementById('location-input').value = saved.name;
+        document.getElementById('lat').value = saved.lat;
+        document.getElementById('lon').value = saved.lon;
+        document.getElementById('place-name').value = saved.name;
+        _locationConfirmed = true;
+      }
+    } catch (e) {}
+  });
 
   function handleLocationInput(el) {
     // If user modifies input after confirming a location, invalidate it.
@@ -84,6 +98,9 @@
   }
 
   function selectLocation(name, lat, lon) {
+    try {
+      localStorage.setItem(LOCATION_KEY, JSON.stringify({name: name, lat: lat, lon: lon}));
+    } catch (e) {}
     document.getElementById('location-input').value = name;
     document.getElementById('lat').value = lat;
     document.getElementById('lon').value = lon;

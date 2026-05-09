@@ -3,10 +3,10 @@
 <ul role="listbox" class="suggestions-list">
   {{range .}}
   <li role="option">
-    <button type="button" class="suggestion-btn"
-            onclick="selectLocation({{.DisplayName | js}}, {{.Lat}}, {{.Lon}})">
+    <a href="#" class="suggestion-btn"
+       onclick="selectLocation({{.DisplayName | js}}, {{.Lat}}, {{.Lon}}); return false;">
       {{.DisplayName}}
-    </button>
+    </a>
   </li>
   {{end}}
 </ul>

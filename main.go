@@ -133,6 +133,9 @@ func main() {
 	r.Post("/analyze", h.Analyze)
 	r.Get("/history", h.History)
 	r.Get("/chart", h.Chart)
+	r.Get("/solar", h.SolarIndex)
+	r.Post("/solar/analyze", h.SolarAnalyze)
+	r.Get("/solar-chart", h.SolarChart)
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	// Background collection worker — runs immediately on startup then on each tick.
