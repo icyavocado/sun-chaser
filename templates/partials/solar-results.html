@@ -149,17 +149,20 @@
   var rows = {{.HourlyDataJSON}};
   var canvas = document.getElementById('solar-profile-chart');
   var placeholder = document.getElementById('solar-profile-placeholder');
-  var analyzedAtEl = document.querySelector('.results-section .analyzed-at time[datetime]');
-  var analyzedAt = analyzedAtEl ? new Date(analyzedAtEl.getAttribute('datetime')) : new Date();
+  var analyzedAt = new Date('{{.AnalyzedAt.UTC.Format "2006-01-02T15:04:05Z"}}');
   var dayStartUTC = Date.UTC(
     analyzedAt.getUTCFullYear(),
     analyzedAt.getUTCMonth(),
     analyzedAt.getUTCDate(),
     0, 0, 0, 0
   );
+  var localLabelForUTCHour = function (utcHour) {
+    var ts = new Date(dayStartUTC);
+    ts.setUTCHours(utcHour, 0, 0, 0);
+    return ts.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  };
   var xLabels = rows.map(function(r) {
-    return new Date(dayStartUTC + (r.Hour * 60 * 60 * 1000))
-      .toLocaleTimeString([], { hour: 'numeric' });
+    return localLabelForUTCHour(r.Hour);
   });
 
   var hasDaylight = rows && rows.some(function(r) { return r.ClearPowerW > 0; });
