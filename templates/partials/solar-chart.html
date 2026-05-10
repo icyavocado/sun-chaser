@@ -15,6 +15,7 @@
   var rows = {{.DataJSON}};
   var canvas = document.getElementById('solar-history-chart');
   var placeholder = document.getElementById('solar-chart-placeholder');
+  var localSuffix = ' local';
   var localLabel = function (iso) {
     var t = new Date(iso);
     if (isNaN(t.getTime())) return iso;
@@ -65,7 +66,7 @@
             title: function(items) {
               if (!items || !items.length) return '';
               var row = rows[items[0].dataIndex];
-              return localLabel(row.analyzed_at) + ' local';
+              return localLabel(row.analyzed_at) + localSuffix;
             }
           }
         }
