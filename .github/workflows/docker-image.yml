@@ -48,7 +48,7 @@ jobs:
       uses: docker/build-push-action@v6
       with:
         context: ${{ env.PARENT_WORKSPACE }}
-        file: sun-chaser/Dockerfile
+        file: ${{ github.workspace }}/Dockerfile
         push: ${{ github.event_name != 'pull_request' }}
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
