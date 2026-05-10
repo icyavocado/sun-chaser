@@ -1,7 +1,8 @@
 {{define "results"}}
 <section class="results-section">
   <h2>Results for {{.PlaceName}}</h2>
-  <p class="analyzed-at">Analyzed at {{.AnalyzedAt.Format "Mon Jan 2, 2006 15:04:05 MST"}}</p>
+  <p class="analyzed-at">Analyzed at <time class="local-time" datetime="{{.AnalyzedAt.UTC.Format "2006-01-02T15:04:05Z"}}">{{.AnalyzedAt.UTC.Format "2006-01-02T15:04:05Z"}}</time></p>
+  <script>document.querySelectorAll('time.local-time').forEach(function(el){var d=new Date(el.getAttribute('datetime'));el.textContent=d.toLocaleString();});</script>
   {{if .OWMWarning}}<p><mark>{{.OWMWarning}}</mark></p>{{end}}
 
   <div class="grid model-grid">
