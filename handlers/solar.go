@@ -27,19 +27,19 @@ type SolarResultData struct {
 	HourlyDataJSON template.JS
 
 	// Financial / practical estimates
-	ElectricityRate     float64
-	MonthlyUsage        float64
-	InstallationCost    float64
-	StorageDays         float64
-	BatteryPerKWh       float64
-	PanelsNeeded        int
+	ElectricityRate      float64
+	MonthlyUsage         float64
+	InstallationCost     float64
+	StorageDays          float64
+	BatteryPerKWh        float64
+	PanelsNeeded         int
 	MonthlyProductionKWh float64
-	MonthlySavings      float64
-	AnnualSavings       float64
-	BreakEvenYears      float64
-	StorageCapacityKWh  float64
-	StorageCost         float64
-	WinterReport        solar.Report
+	MonthlySavings       float64
+	AnnualSavings        float64
+	BreakEvenYears       float64
+	StorageCapacityKWh   float64
+	StorageCost          float64
+	WinterReport         solar.Report
 }
 
 // SolarIndex serves the /solar page.
@@ -167,11 +167,11 @@ func (h *Handler) SolarAnalyze(w http.ResponseWriter, r *http.Request) {
 	_ = h.db.UpsertWatchedLocation(placeName, lat, lon)
 
 	// --- Parse economics inputs ---
-	electricityRate  := parseFloatOr(r.FormValue("electricity_rate"), 0.13)
-	monthlyUsage     := parseFloatOr(r.FormValue("monthly_usage"), 900)
+	electricityRate := parseFloatOr(r.FormValue("electricity_rate"), 0.13)
+	monthlyUsage := parseFloatOr(r.FormValue("monthly_usage"), 900)
 	installationCost := parseFloatOr(r.FormValue("installation_cost"), 15000)
-	storageDays      := parseFloatOr(r.FormValue("storage_days"), 1)
-	batteryPerKWh    := parseFloatOr(r.FormValue("battery_per_kwh"), 400)
+	storageDays := parseFloatOr(r.FormValue("storage_days"), 1)
+	batteryPerKWh := parseFloatOr(r.FormValue("battery_per_kwh"), 400)
 
 	// --- Winter solstice estimate (same panel, same cloud fraction) ---
 	winterMonth := time.December
@@ -192,8 +192,8 @@ func (h *Handler) SolarAnalyze(w http.ResponseWriter, r *http.Request) {
 	}
 
 	monthlyProductionKWh := report.OWMDailyKWh * float64(panelsNeeded) * 30.0
-	mSavings             := monthlyProductionKWh * electricityRate
-	annualSavings        := mSavings * 12.0
+	mSavings := monthlyProductionKWh * electricityRate
+	annualSavings := mSavings * 12.0
 
 	var breakEvenYears float64
 	if annualSavings > 0 {
@@ -203,7 +203,7 @@ func (h *Handler) SolarAnalyze(w http.ResponseWriter, r *http.Request) {
 	}
 
 	storageCapacityKWh := report.OWMDailyKWh * float64(panelsNeeded) * storageDays
-	storageCost        := storageCapacityKWh * batteryPerKWh
+	storageCost := storageCapacityKWh * batteryPerKWh
 
 	// --- Build hourly profile JSON for inline chart ---
 	hourlyJSON, _ := json.Marshal(report.HourlyProfile)
@@ -273,7 +273,7 @@ func (h *Handler) SolarChart(w http.ResponseWriter, r *http.Request) {
 	var points []SolarChartData
 	for _, row := range rows {
 		points = append(points, SolarChartData{
-			AnalyzedAt:    row.AnalyzedAt.Format("2006-01-02 15:04"),
+			AnalyzedAt:    row.AnalyzedAt.UTC().Format(time.RFC3339),
 			ClearDailyKWh: row.ClearDailyKWh,
 			OWMDailyKWh:   row.OWMDailyKWh,
 		})
