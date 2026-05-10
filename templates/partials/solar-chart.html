@@ -15,6 +15,17 @@
   var rows = {{.DataJSON}};
   var canvas = document.getElementById('solar-history-chart');
   var placeholder = document.getElementById('solar-chart-placeholder');
+  var localLabel = function (iso) {
+    var t = new Date(iso);
+    if (isNaN(t.getTime())) return iso;
+    return t.toLocaleString([], {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
   if (!rows || rows.length < 2) {
     if (canvas) canvas.hidden = true;
@@ -27,7 +38,7 @@
   canvas._chartInstance = new Chart(canvas, {
     type: 'line',
     data: {
-      labels: rows.map(function(r) { return r.analyzed_at; }),
+      labels: rows.map(function(r) { return localLabel(r.analyzed_at); }),
       datasets: [
         {
           label: 'Clear sky (kWh/day)',
@@ -47,7 +58,17 @@
       responsive: true,
       plugins: {
         legend: { position: 'top' },
-        tooltip: { mode: 'index', intersect: false }
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            title: function(items) {
+              if (!items || !items.length) return '';
+              var row = rows[items[0].dataIndex];
+              return localLabel(row.analyzed_at) + ' local';
+            }
+          }
+        }
       },
       scales: {
         x: { title: { display: true, text: 'Analysis time' } },

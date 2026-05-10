@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 // chartData is passed to the chart partial template.
@@ -39,7 +40,7 @@ func (h *Handler) Chart(w http.ResponseWriter, r *http.Request) {
 	points := make([]historyPoint, 0, len(rows))
 	for _, row := range rows {
 		points = append(points, historyPoint{
-			AnalyzedAt:   row.AnalyzedAt.Format("Jan 2 15:04"),
+			AnalyzedAt:   row.AnalyzedAt.UTC().Format(time.RFC3339),
 			ClearSkyNits: roundTo(row.ClearSkyNits, 1),
 			OWMNits:      roundTo(row.OWMNits, 1),
 		})
