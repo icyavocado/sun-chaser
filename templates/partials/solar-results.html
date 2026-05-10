@@ -149,6 +149,18 @@
   var rows = {{.HourlyDataJSON}};
   var canvas = document.getElementById('solar-profile-chart');
   var placeholder = document.getElementById('solar-profile-placeholder');
+  var analyzedAtEl = document.querySelector('.results-section .analyzed-at time[datetime]');
+  var analyzedAt = analyzedAtEl ? new Date(analyzedAtEl.getAttribute('datetime')) : new Date();
+  var dayStartUTC = Date.UTC(
+    analyzedAt.getUTCFullYear(),
+    analyzedAt.getUTCMonth(),
+    analyzedAt.getUTCDate(),
+    0, 0, 0, 0
+  );
+  var xLabels = rows.map(function(r) {
+    return new Date(dayStartUTC + (r.Hour * 60 * 60 * 1000))
+      .toLocaleTimeString([], { hour: 'numeric' });
+  });
 
   var hasDaylight = rows && rows.some(function(r) { return r.ClearPowerW > 0; });
   if (!hasDaylight) {
@@ -162,7 +174,7 @@
   canvas._chartInstance = new Chart(canvas, {
     type: 'bar',
     data: {
-      labels: rows.map(function(r) { return r.Hour + ':00'; }),
+      labels: xLabels,
       datasets: [
         {
           label: 'Clear sky (W)',
@@ -180,10 +192,20 @@
       responsive: true,
       plugins: {
         legend: { position: 'top' },
-        tooltip: { mode: 'index', intersect: false }
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            title: function(items) {
+              if (!items || !items.length) return '';
+              var row = rows[items[0].dataIndex];
+              return items[0].label + ' local (UTC ' + row.Hour + ':00)';
+            }
+          }
+        }
       },
       scales: {
-        x: { title: { display: true, text: 'Hour (UTC)' } },
+        x: { title: { display: true, text: 'Hour (local time)' } },
         y: {
           beginAtZero: true,
           title: { display: true, text: 'Power (W)' }
